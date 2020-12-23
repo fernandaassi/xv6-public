@@ -530,5 +530,22 @@ procdump(void)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
+
+    // walkpgdir, PDX(va), PTX(va), PGADDR(d, t, o)
+
+    // Implementação das novas informações
+    cprintf("Page tables:\n");
+    cprintf("\tmemory location of page directory = %x\n", p->pgdir);
+    // for pdir
+    cprintf("\tpdir PTE %d, %d:\n", pdir_entry_number, pdir_ppn);
+    cprintf("\t\tmemory location of page table = %d\n", page_table);
+    // for ptbl
+    cprintf("\t\tptbl PTE %d, %d, %d\n", ptbl_entry_number, ptbl_ppn, phys_page);
+    cprintf("Page mappings:\n");
+    // for mapping
+    cprintf("%d -> %d, \n", page_num, phys_num);
+
+    cprintf("Size: %d\n", p->sz);
+    cprintf("Bottom of kernel stack: %x\n", p->kstack);
   }
 }

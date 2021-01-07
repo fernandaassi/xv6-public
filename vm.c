@@ -195,7 +195,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
 // Load a program segment into pgdir.  addr must be page-aligned
 // and the pages from addr to addr+sz must already be mapped.
 int
-loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint flag)
+loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint phflag)
 {
   uint i, pa, n;
   pte_t *pte;
@@ -206,8 +206,12 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint f
     if((pte = walkpgdir(pgdir, addr+i, 0)) == 0)
       panic("loaduvm: address should exist");
     pa = PTE_ADDR(*pte);
-    if ((flag & ELF_PROG_FLAG_WRITE) == 0)
+
+    // Se segmento de texto nao puder ser escrito (descrito em program header flag),
+    // remove a flag de escrita do page table entry
+    if (phflag == (ELF_PROG_FLAG_EXEC | ELF_PROG_FLAG_READ))
       *pte &= ~PTE_W;
+    
     if(sz - i < PGSIZE)
       n = sz - i;
     else

@@ -3,8 +3,9 @@
 #include "user.h"
 
 int main(int argc, char *argv[]) {
-    void *m = main;
-    *((char*) m) = 0;
-    printf(1, "Teste\n");
+    char *m = (char *)main;
+    printf(1,"main addr before: %x\n", *m);
+    *m = 0;
+    printf(1,"main addr after: %x\n", *m);
     exit();
 }

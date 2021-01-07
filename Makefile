@@ -145,15 +145,19 @@ vectors.S: vectors.pl
 
 ULIB = ulib.o usys.o printf.o umalloc.o
 
+# Task 3: trocar flag -N por flag -n para segmento de texto
+# ser read-only
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -n -e main -Ttext 0x1000 -o $@ $^
+	$(LD) $(LDFLAGS) -n -e main -Ttext 0 -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
+# Task 3: trocar flag -N por flag -n para segmento de texto
+# ser read-only
 _forktest: forktest.o $(ULIB)
 	# forktest has less library code linked in - needs to be small
 	# in order to be able to max out the proc table.
-	$(LD) $(LDFLAGS) -n -e main -Ttext 0x1000 -o _forktest forktest.o ulib.o usys.o
+	$(LD) $(LDFLAGS) -n -e main -Ttext 0 -o _forktest forktest.o ulib.o usys.o
 	$(OBJDUMP) -S _forktest > forktest.asm
 
 mkfs: mkfs.c fs.h

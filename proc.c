@@ -496,6 +496,70 @@ kill(int pid)
   return -1;
 }
 
+int 
+diretorioUtilizado(pte_t* pte) 
+{
+  int i;
+  for (i = 0; i < NPTENTRIES; ++i) {
+    if ((pte[i] & PTE_P) && (pte[i] & PTE_U)) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+void
+procInfo(struct proc *p) 
+{
+  cprintf("Page tables:\n");
+  cprintf("\tmemory location of page directory = %x\n", (p->pgdir));
+  uint i;
+  for (i = 0; i < NPDENTRIES; i++)
+  {
+    // Encontrar o PPN da page table
+    pde_t pde = p->pgdir[i];
+    pde_t *pte_addr = (pde_t *)PTE_ADDR(pde);
+    // Transformar para endereco virtual
+    pte_t *page_table = (pte_t *)P2V(pte_addr);
+    
+    if ((pde & PTE_P) && (pde & PTE_U) && diretorioUtilizado(page_table))
+    {
+      uint ppn = (uint)pte_addr >> 12;
+      cprintf("\tpdir PTE %d, %x:\n", i + 1, ppn);
+      cprintf("\t\tmemory location of page table = %x\n", page_table);
+
+      // Achar os enderecos fisicos na page table
+      uint j;
+      for (j = 0; j < NPTENTRIES; j++)
+      {
+        if ((page_table[j] & PTE_P) && (page_table[j] & PTE_U))
+        {
+          pte_t *ph_addr = (pte_t *)PTE_ADDR(page_table[j]);
+          ppn = (uint)ph_addr >> 12;
+          cprintf("\t\tptbl PTE %d, %x, %x\n", j + 1, ppn, ph_addr);
+        }
+      }
+    }
+  }
+
+  cprintf("Page mappings:\n");
+  for (i = 0; i < NPDENTRIES; i++)
+  {
+    // Encontrar o PPN da page table
+    pde_t pde = p->pgdir[i];
+    pde_t *pte_addr = (pde_t *)PTE_ADDR(pde);
+    // Transformar para endereco virtual
+    pte_t *page_table = (pte_t *)P2V(pte_addr);
+    pte_t *vt_addr = (pte_t *)(PTE_ADDR(page_table) >> 12);
+    uint ppn = (uint)pte_addr >> 12;
+    if ((pde & PTE_P) && (pde & PTE_U) && diretorioUtilizado(page_table)) {
+      cprintf("%x -> %x\n", vt_addr, ppn);
+    }
+  }
+  cprintf("\n");
+}
+
 //PAGEBREAK: 36
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
@@ -531,32 +595,6 @@ procdump(void)
     }
     cprintf("\n");
 
-    // walkpgdir, PDX(va), PTX(va), PGADDR(d, t, o)
-
-    uint ppn;
-    cprintf("Page tables:\n");
-    cprintf("\tmemory location of page directory = %x\n", (p->pgdir));
-    for (uint i = 0; p->pgdir[i] != 0; i++) {
-      // Encontrar o PPN da page table
-      pde_t* pde = &p->pgdir[i];
-      pde_t* pte_addr = (pde_t*) PTE_ADDR(*pde);
-      ppn = (uint)pte_addr >> 12;
-      cprintf("\tpdir PTE %d, %x:\n", i+1, ppn);
-
-      // Transformar para endereco virtual
-      pte_t* page_table = (pte_t*) P2V(pte_addr);
-      cprintf("\t\tmemory location of page table = %x\n", page_table);
-
-      // Achar os enderecos fisicos na page table
-      for (uint j = 0; PTE_ADDR(page_table[j]) != 0; j++) {
-          pte_t* ph_addr = (pte_t*) PTE_ADDR(page_table[j]);
-          ppn = (uint)ph_addr >> 12;
-          cprintf("\t\tptbl PTE %d, %x, %x\n", j + 1, ppn, ph_addr);
-      }
-    }
-
-    // cprintf("Page mappings:\n");
-    // // for mapping
-    // cprintf("%d -> %d, \n", page_num, phys_num);
+    procInfo(p);
   }
 }

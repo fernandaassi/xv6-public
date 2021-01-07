@@ -4,8 +4,20 @@
 
 int main(int argc, char *argv[]) {
     char *m = (char *)main;
-    printf(1,"main antes da modificacao: %p\n", *m);
+
+    if(fork() == 0) {
+        printf(1,"main filho antes da modificacao: %p\n", *m);
+        *m = 0;
+        printf(1,"main filho apos modificacao: %p\n", *m);
+
+        exit();
+    }
+
+    wait();
+
+    printf(1,"main pai antes da modificacao: %p\n", *m);
     *m = 0;
-    printf(1,"main apos modificacao: %p\n", *m);
+    printf(1,"main pai apos modificacao: %p\n", *m);
+
     exit();
 }

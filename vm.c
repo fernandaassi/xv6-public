@@ -209,7 +209,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint p
 
     // Se segmento de texto nao puder ser escrito (descrito em program header flag),
     // remove a flag de escrita do page table entry
-    if (phflag == (ELF_PROG_FLAG_EXEC | ELF_PROG_FLAG_READ))
+    if ((phflag & PTE_W) == 0)
       *pte &= ~PTE_W;
     
     if(sz - i < PGSIZE)

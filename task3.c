@@ -4,8 +4,8 @@
 
 int main(int argc, char *argv[]) {
     char *m = (char *)main;
-    printf(1,"main addr before: %x\n", *m);
+    printf(1,"main antes da modificacao: %p\n", *m);
     *m = 0;
-    printf(1,"main addr after: %x\n", *m);
+    printf(1,"main apos modificacao: %p\n", *m);
     exit();
 }

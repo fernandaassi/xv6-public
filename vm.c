@@ -205,13 +205,11 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint p
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, addr+i, 0)) == 0)
       panic("loaduvm: address should exist");
-    pa = PTE_ADDR(*pte);
-
     // Se segmento de texto nao puder ser escrito (descrito em program header flag),
     // remove a flag de escrita do page table entry
     if ((phflag & PTE_W) == 0)
       *pte &= ~PTE_W;
-    
+    pa = PTE_ADDR(*pte);
     if(sz - i < PGSIZE)
       n = sz - i;
     else

@@ -207,7 +207,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz, uint p
       panic("loaduvm: address should exist");
     // Se segmento de texto nao puder ser escrito (descrito em program header flag),
     // remove a flag de escrita do page table entry
-    if ((phflag & PTE_W) == 0)
+    if ((phflag & ELF_PROG_FLAG_WRITE) == 0)
       *pte &= ~PTE_W;
     pa = PTE_ADDR(*pte);
     if(sz - i < PGSIZE)

@@ -6,6 +6,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "elf.h"
+#include "spinlock.h"
 
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
@@ -345,7 +346,7 @@ bad:
 }
 
 // TASK 4 - COWFORK
-static short int shareprocs[0xE000];
+static short int shareprocs[0xe000];
 struct spinlock sharelock;
 
 void
@@ -393,14 +394,17 @@ cowfault(void)
 {
   uint cr2 = rcr2();
   pte_t *pte;
+  struct proc *curproc;
+
+  curproc = myproc();
 
   if(cr2 != 0)
   {
-    pte = walkpgdir(proc->pgdir, (void *) cr2, 0);
+    pte = walkpgdir(curproc->pgdir, (void *) cr2, 0);
     if(PTE_FLAGS(pte) & PTE_SH)
       cowuvm(cr2);
     else
-      kill(proc->pid);
+      kill(curproc->pid);
   }
 }
 
@@ -419,7 +423,7 @@ cowshare(pde_t *pgdir, uint sz)
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
     pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte) & ~PTE_W | PTE_SH;
+    flags = (PTE_FLAGS(*pte) & ~PTE_W) | PTE_SH;
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
       goto bad;
     }
@@ -432,14 +436,17 @@ bad:
   return 0;
 }
 
-pde_t*
+int
 cowuvm(uint cr2)
 {
   pte_t *pte;
   uint pa, flags;
   char *mem;
+  struct proc *curproc;
 
-  if((pte = walkpgdir(proc->pgdir, (void *) cr2, 0)) == 0)
+  curproc = myproc();
+
+  if((pte = walkpgdir(curproc->pgdir, (void *) cr2, 0)) == 0)
     panic("copyuvm: pte should exist");
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
@@ -450,18 +457,13 @@ cowuvm(uint cr2)
       goto bad;
     memmove(mem, (char*)P2V(pa), PGSIZE);
 
-    flags = flags & ~PTE_SH | PTE_W;
-    *pte = pa | flags;
-
     decrementshare(pa);
   }
-  else
-  {
-    flags = flags & ~PTE_SH | PTE_W;
-    *pte = pa | flags;
-  }
 
-  lcr3(V2P(proc->pgdir));
+  flags = (flags & ~PTE_SH) | PTE_W;
+  *pte = pa | flags;
+
+  lcr3(V2P(curproc->pgdir));
 
   return 1;
 
@@ -476,7 +478,7 @@ freecow(pde_t *pgdir)
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, KERNBASE, 0);
+  dealloccow(pgdir, KERNBASE, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P){
       char * v = P2V(PTE_ADDR(pgdir[i]));
@@ -484,6 +486,37 @@ freecow(pde_t *pgdir)
     }
   }
   kfree((char*)pgdir);
+}
+
+int
+dealloccow(pde_t *pgdir, uint oldsz, uint newsz)
+{
+  pte_t *pte;
+  uint a, pa;
+
+  if(newsz >= oldsz)
+    return oldsz;
+
+  a = PGROUNDUP(newsz);
+  for(; a  < oldsz; a += PGSIZE){
+    pte = walkpgdir(pgdir, (char*)a, 0);
+    if(!pte)
+      a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
+    else if((*pte & PTE_P) != 0){
+      pa = PTE_ADDR(*pte);
+      if(pa == 0)
+        panic("kfree");
+      
+      if(countshare(pa) <= 1)
+      {
+        char *v = P2V(pa);
+        kfree(v);
+      }
+      decrementshare(pa);
+      *pte = 0;
+    }
+  }
+  return newsz;
 }
 
 //PAGEBREAK!

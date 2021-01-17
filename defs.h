@@ -186,14 +186,17 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
+// TASK 4 - COW fork
+int             cowfork(void);
 void            shareinit(void);
 short int       countshare(uint);
 void            incrementshare(uint);
 void            decrementshare(uint);
 void            cowfault(void);
 pde_t*          cowshare(pde_t *, uint);
-pde_t*          cowuvm(uint);
+int             cowuvm(uint);
 void            freecow(pde_t *);
+int             dealloccow(pde_t *, uint, uint);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

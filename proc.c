@@ -222,7 +222,8 @@ fork(void)
 }
 
 // ----- TASK 4 - COWFORK -----
-int cowfork(void)
+int
+cowfork(void)
 {
   int i, pid;
   struct proc *np;
@@ -337,7 +338,13 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        if(p->shmem)
+        {
+          freecow(p->pgdir);
+          p->shmem = 0;
+        }
+        else
+          freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;

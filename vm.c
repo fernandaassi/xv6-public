@@ -350,7 +350,7 @@ bad:
 // Estrutura para monitoramento dos processos compartilhando memoria.
 static short int shareprocs[0xe000];
 
-// 
+// Trava para impedir mais de uma operacao na estrutura ao mesmo tempo.
 struct spinlock sharelock;
 
 // Inicializao da trava para a estrutura.
@@ -405,26 +405,7 @@ decrementshare(uint pa)
   cprintf("decrementshare: sharelock decrementado para %d\n", pa);
 }
 
-void
-cowfault(void)
-{
-  uint cr2 = rcr2();
-  pte_t *pte;
-  struct proc *curproc;
-
-  curproc = myproc();
-
-  if(cr2 != 0)
-  {
-    cprintf("cowfault: page fault. iniciando copia de memoria\n");
-    pte = walkpgdir(curproc->pgdir, (void *) cr2, 0);
-    if(PTE_FLAGS(pte) & PTE_SH)
-      cowuvm(cr2);
-    else
-      kill(curproc->pid);
-  }
-}
-
+// Compartilha e mapeia a memoria de um processo criado com cowfork.
 pde_t*
 cowshare(pde_t *pgdir, uint sz)
 {
@@ -455,6 +436,29 @@ bad:
   return 0;
 }
 
+// Trata a falta de pagina de processo com memoria compartilhada.
+void
+cowfault(void)
+{
+  uint cr2 = rcr2();
+  pte_t *pte;
+  struct proc *curproc;
+
+  curproc = myproc();
+
+  if(cr2 != 0)
+  {
+    cprintf("cowfault: page fault. iniciando copia de memoria\n");
+    pte = walkpgdir(curproc->pgdir, (void *) cr2, 0);
+    if(PTE_FLAGS(pte) & PTE_SH)
+      cowuvm(cr2);
+    else
+      kill(curproc->pid);
+  }
+}
+
+// Aloca nova porcao de memoria para um processo que tinha
+// memoria compartilhada.
 int
 cowuvm(uint cr2)
 {
@@ -493,6 +497,7 @@ bad:
   return 0;
 }
 
+// Libera a memoria de um processo
 void
 freecow(pde_t *pgdir)
 {

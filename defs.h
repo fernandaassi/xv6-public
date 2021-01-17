@@ -186,5 +186,14 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
+void            shareinit(void);
+short int       countshare(uint);
+void            incrementshare(uint);
+void            decrementshare(uint);
+void            cowfault(void);
+pde_t*          cowshare(pde_t *, uint);
+pde_t*          cowuvm(uint);
+void            freecow(pde_t *);
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

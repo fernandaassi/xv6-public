@@ -344,6 +344,148 @@ bad:
   return 0;
 }
 
+// TASK 4 - COWFORK
+static short int shareprocs[0xE000];
+struct spinlock sharelock;
+
+void
+shareinit(void)
+{
+  initlock(&sharelock, "shareprocs");
+}
+
+short int
+countshare(uint pa)
+{
+  short int n;
+
+  acquire(&sharelock);
+  n = shareprocs[pa >> 12];
+  release(&sharelock);
+
+  return n;
+}
+
+void
+incrementshare(uint pa)
+{
+  short int n;
+  n = countshare(pa);
+
+  acquire(&sharelock);
+  if(n == 0)
+    shareprocs[pa >> 12] += 2;
+  else
+    shareprocs[pa >> 12] += 1;
+  release(&sharelock);
+}
+
+void
+decrementshare(uint pa)
+{
+  acquire(&sharelock);
+  shareprocs[pa >> 12] -= 1;
+  release(&sharelock);
+}
+
+void
+cowfault(void)
+{
+  uint cr2 = rcr2();
+  pte_t *pte;
+
+  if(cr2 != 0)
+  {
+    pte = walkpgdir(proc->pgdir, (void *) cr2, 0);
+    if(PTE_FLAGS(pte) & PTE_SH)
+      cowuvm(cr2);
+    else
+      kill(proc->pid);
+  }
+}
+
+pde_t*
+cowshare(pde_t *pgdir, uint sz)
+{
+  pde_t *d;
+  pte_t *pte;
+  uint pa, i, flags;
+
+  if((d = setupkvm()) == 0)
+    return 0;
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
+      panic("copyuvm: pte should exist");
+    if(!(*pte & PTE_P))
+      panic("copyuvm: page not present");
+    pa = PTE_ADDR(*pte);
+    flags = PTE_FLAGS(*pte) & ~PTE_W | PTE_SH;
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
+      goto bad;
+    }
+    incrementshare(pa);
+  }
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
+}
+
+pde_t*
+cowuvm(uint cr2)
+{
+  pte_t *pte;
+  uint pa, flags;
+  char *mem;
+
+  if((pte = walkpgdir(proc->pgdir, (void *) cr2, 0)) == 0)
+    panic("copyuvm: pte should exist");
+  pa = PTE_ADDR(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  if(countshare(pa) > 1)
+  { 
+    if((mem = kalloc()) == 0)
+      goto bad;
+    memmove(mem, (char*)P2V(pa), PGSIZE);
+
+    flags = flags & ~PTE_SH | PTE_W;
+    *pte = pa | flags;
+
+    decrementshare(pa);
+  }
+  else
+  {
+    flags = flags & ~PTE_SH | PTE_W;
+    *pte = pa | flags;
+  }
+
+  lcr3(V2P(proc->pgdir));
+
+  return 1;
+
+bad:
+  return 0;
+}
+
+void
+freecow(pde_t *pgdir)
+{
+  uint i;
+
+  if(pgdir == 0)
+    panic("freevm: no pgdir");
+  deallocuvm(pgdir, KERNBASE, 0);
+  for(i = 0; i < NPDENTRIES; i++){
+    if(pgdir[i] & PTE_P){
+      char * v = P2V(PTE_ADDR(pgdir[i]));
+      kfree(v);
+    }
+  }
+  kfree((char*)pgdir);
+}
+
 //PAGEBREAK!
 // Map user virtual address to kernel address.
 char*

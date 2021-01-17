@@ -346,15 +346,22 @@ bad:
 }
 
 // TASK 4 - COWFORK
+
+// Estrutura para monitoramento dos processos compartilhando memoria.
 static short int shareprocs[0xe000];
+
+// 
 struct spinlock sharelock;
 
+// Inicializao da trava para a estrutura.
 void
 shareinit(void)
 {
   initlock(&sharelock, "shareprocs");
+  cprintf("shareinit: sharelock inicializado\n");
 }
 
+// Retorna a quantidade de processos compartilhando o endereco pa.
 short int
 countshare(uint pa)
 {
@@ -367,6 +374,10 @@ countshare(uint pa)
   return n;
 }
 
+// Incrementa o numero de processos compartilhando o endereco pa.
+// Se nao houver processo sendo monitorado ainda no endereco, o
+// compartilhamento e novo, entao adiciona 2 ao contador (para
+// o pai e filho).
 void
 incrementshare(uint pa)
 {
@@ -379,14 +390,19 @@ incrementshare(uint pa)
   else
     shareprocs[pa >> 12] += 1;
   release(&sharelock);
+
+  cprintf("incrementshare: sharelock incrementado para %d\n", pa);
 }
 
+// Decrementa o numero de processos compartilhando o endereco pa.
 void
 decrementshare(uint pa)
 {
   acquire(&sharelock);
   shareprocs[pa >> 12] -= 1;
   release(&sharelock);
+
+  cprintf("decrementshare: sharelock decrementado para %d\n", pa);
 }
 
 void
@@ -400,6 +416,7 @@ cowfault(void)
 
   if(cr2 != 0)
   {
+    cprintf("cowfault: page fault. iniciando copia de memoria\n");
     pte = walkpgdir(curproc->pgdir, (void *) cr2, 0);
     if(PTE_FLAGS(pte) & PTE_SH)
       cowuvm(cr2);
@@ -415,13 +432,14 @@ cowshare(pde_t *pgdir, uint sz)
   pte_t *pte;
   uint pa, i, flags;
 
+  cprintf("cowshare: iniciando compartilhamento de memoria entre processos\n");
   if((d = setupkvm()) == 0)
     return 0;
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
-      panic("copyuvm: pte should exist");
+      panic("cowshare: pte should exist");
     if(!(*pte & PTE_P))
-      panic("copyuvm: page not present");
+      panic("cowshare: page not present");
     pa = PTE_ADDR(*pte);
     flags = (PTE_FLAGS(*pte) & ~PTE_W) | PTE_SH;
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
@@ -429,6 +447,7 @@ cowshare(pde_t *pgdir, uint sz)
     }
     incrementshare(pa);
   }
+  cprintf("cowshare: paginas compartilhadas mapeadas com sucesso\n");
   return d;
 
 bad:
@@ -446,8 +465,9 @@ cowuvm(uint cr2)
 
   curproc = myproc();
 
+  cprintf("cowuvm: iniciando alocacao de memoria para processo compartilhado\n");
   if((pte = walkpgdir(curproc->pgdir, (void *) cr2, 0)) == 0)
-    panic("copyuvm: pte should exist");
+    panic("cowuvm: pte should exist");
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
 
@@ -459,6 +479,8 @@ cowuvm(uint cr2)
 
     decrementshare(pa);
   }
+
+  cprintf("ncowuvm: memoria nova foi alocada\n");
 
   flags = (flags & ~PTE_SH) | PTE_W;
   *pte = pa | flags;
@@ -476,6 +498,7 @@ freecow(pde_t *pgdir)
 {
   uint i;
 
+  cprintf("freecow: iniciando liberacao\n");
   if(pgdir == 0)
     panic("freevm: no pgdir");
   dealloccow(pgdir, KERNBASE, 0);
@@ -486,6 +509,7 @@ freecow(pde_t *pgdir)
     }
   }
   kfree((char*)pgdir);
+  cprintf("freecow: memoria liberada\n");
 }
 
 int
@@ -496,7 +520,7 @@ dealloccow(pde_t *pgdir, uint oldsz, uint newsz)
 
   if(newsz >= oldsz)
     return oldsz;
-
+  cprintf("dealloccow: iniciando desalocacao\n");
   a = PGROUNDUP(newsz);
   for(; a  < oldsz; a += PGSIZE){
     pte = walkpgdir(pgdir, (char*)a, 0);
@@ -511,6 +535,7 @@ dealloccow(pde_t *pgdir, uint oldsz, uint newsz)
       {
         char *v = P2V(pa);
         kfree(v);
+        cprintf("dealloccow: nao havia compartilhamento. memoria desalocada.\n");
       }
       decrementshare(pa);
       *pte = 0;

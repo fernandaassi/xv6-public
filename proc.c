@@ -111,6 +111,7 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  p->shmem = 0;
 
   return p;
 }
@@ -221,7 +222,7 @@ fork(void)
   return pid;
 }
 
-// ----- TASK 4 - COWFORK -----
+// TASK 4 - COWFORK
 int
 cowfork(void)
 {
@@ -245,12 +246,12 @@ cowfork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
   // COWFORK
   np->shmem = 1;
   curproc->shmem = 1;
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])

@@ -92,7 +92,7 @@ trap(struct trapframe *tf)
             myproc()->pid, myproc()->name, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
 
-    // Aviso de page fault -> acesso indevido
+    // Task 3 - Aviso de page fault -> acesso indevido
     if(tf->trapno == T_PGFLT)
       cprintf("Segmentation fault (core not dumped)\n");
     

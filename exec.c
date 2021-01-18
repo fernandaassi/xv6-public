@@ -53,6 +53,7 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
+    // Task 3 - Chama loaduvm com as flags do program header
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz, ph.flags) < 0)
       goto bad;
   }

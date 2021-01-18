@@ -348,7 +348,7 @@ bad:
 // TASK 4 - COWFORK
 
 // Estrutura para monitoramento dos processos compartilhando memoria.
-static short int shareprocs[0xe000];
+static short int shareprocs[PHYSTOP >> 12];
 
 // Trava para impedir mais de uma operacao na estrutura ao mesmo tempo.
 struct spinlock sharelock;

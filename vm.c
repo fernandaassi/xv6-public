@@ -422,10 +422,12 @@ cowshare(pde_t *pgdir, uint sz)
     if(!(*pte & PTE_P))
       panic("cowshare: page not present");
     pa = PTE_ADDR(*pte);
+    // Desativa a flag de escrita e ativa a flag de compartilhamento
     flags = (PTE_FLAGS(*pte) & ~PTE_W) | PTE_SH;
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
       goto bad;
     }
+    // Aumenta o no. de processos compartilhando a pagina
     incrementshare(pa);
   }
   cprintf("cowshare: paginas compartilhadas mapeadas com sucesso\n");
@@ -450,6 +452,7 @@ cowfault(void)
   {
     cprintf("cowfault: page fault. iniciando copia de memoria\n");
     pte = walkpgdir(curproc->pgdir, (void *) cr2, 0);
+    // Se a page fault foi causada por processo com memoria compartilhada
     if(PTE_FLAGS(pte) & PTE_SH)
       cowuvm(cr2);
     else
@@ -475,6 +478,7 @@ cowuvm(uint cr2)
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
 
+  // Se houver processos compartilhando a memoria, aloca novo espaco
   if(countshare(pa) > 1)
   { 
     if((mem = kalloc()) == 0)
@@ -484,8 +488,9 @@ cowuvm(uint cr2)
     decrementshare(pa);
   }
 
-  cprintf("ncowuvm: memoria nova foi alocada\n");
+  cprintf("cowuvm: memoria nova foi alocada\n");
 
+  // Remove a flag de compartilhamento e permite a escrita novamente
   flags = (flags & ~PTE_SH) | PTE_W;
   *pte = pa | flags;
 
@@ -517,6 +522,7 @@ freecow(pde_t *pgdir)
   cprintf("freecow: memoria liberada\n");
 }
 
+// Desaloca o processo com memoria compartilhada.
 int
 dealloccow(pde_t *pgdir, uint oldsz, uint newsz)
 {

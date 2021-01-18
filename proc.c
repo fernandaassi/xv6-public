@@ -500,12 +500,16 @@ int
 diretorioUtilizado(pte_t* pte) 
 {
   int i;
+  // checa todas as NPTENTRIES == 1024 posições na PTE
   for (i = 0; i < NPTENTRIES; ++i) {
+    // se a PTE possui alguma entrada em uso && a entrada pertence ao usuario
     if ((pte[i] & PTE_P) && (pte[i] & PTE_U)) {
+      // retorna 1 pois a PTE realmente tem utilidade para o processo
       return 1;
     }
   }
 
+  // senao, esta so alocado ao processo mas nao em uso (pelo menos por enquanto)
   return 0;
 }
 
@@ -523,6 +527,8 @@ procInfo(struct proc *p)
     // Transformar para endereco virtual
     pte_t *page_table = (pte_t *)P2V(pte_addr);
     
+    // checar se a entrada esta em uso && se a entrada partence ao usuario
+    // && se alguma pagina dentro da pte esta em uso
     if ((pde & PTE_P) && (pde & PTE_U) && diretorioUtilizado(page_table))
     {
       uint ppn = (uint)pte_addr >> 12;
@@ -531,6 +537,9 @@ procInfo(struct proc *p)
 
       // Achar os enderecos fisicos na page table
       uint j;
+      // Repete o que foi feito em diretorioUtilizado(page_table)
+      // Mas agora printa a posição de memória
+      // antes era so a checagem
       for (j = 0; j < NPTENTRIES; j++)
       {
         if ((page_table[j] & PTE_P) && (page_table[j] & PTE_U))
@@ -553,6 +562,7 @@ procInfo(struct proc *p)
     pte_t *page_table = (pte_t *)P2V(pte_addr);
     pte_t *vt_addr = (pte_t *)(PTE_ADDR(page_table) >> 12);
     uint ppn = (uint)pte_addr >> 12;
+    // checagem para evitar que printe memoria apenas alocada mas nao utilizada
     if ((pde & PTE_P) && (pde & PTE_U) && diretorioUtilizado(page_table)) {
       cprintf("%x -> %x\n", vt_addr, ppn);
     }
